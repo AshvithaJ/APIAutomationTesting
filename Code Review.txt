@@ -1,0 +1,112 @@
+Part 3: Code Review
+
+Below are extracts from 3 files: Feature, Step Def and Page Object. For each extract, list the points you would make if you had to review the code.
+
+
+
+Feature File:
+Feature: Client selecting to withdraw from ISA sees the enter amount screen Given Client A logs launches their Cash ISA and is on the overview page
+When the client chooses to Withdraw from "E2ETest ISA Bank {$$$$}" ISA product And the ISA withdrawal enter amount page displays with "Withdraw from Cash ISA product" header
+
+//Review comment 1: Then statement is missing in this scenario – either ‘And’ should be replaced with ‘Then’ or there should be a Then statement for assertion to happen
+
+// Review Comment 2: To test client selecting different ISAs we can use “Scenario Outline” and pass the values using Data Tables and delimited parameters
+
+
+Step Def File:
+
+package uk.co.hl.ta.task.stepdefs;
+
+import io.cucumber.java.en.And; import io.cucumber.java.en.When; import org.openqa.selenium.By;
+import org.openqa.selenium.WebElement;
+import uk.co.hl.savings.ds.acceptance.proxy.pagemodel.isaOverviewPage;
+import uk.co.hl.savings.ds.acceptance.proxy.pagemodel.WithdrawalFromInstrumentForIsaPage; import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.Assert.assertTrue;
+
+public class IsaWithdrawalStepDefs extends ProxyIntegrationAbstractStepDef {
+
+private isaOverviewPage isaOverviewPage;
+private WithdrawalFromInstrumentForIsaPage withdrawIsaAmountPage;
+private static final By AMOUNT = By.id("sv-amount");
+
+@When("the client chooses to Withdraw from {string} ISA product") public void theClientChoosesToWithdrawFromIsaProduct(String bankName) {
+String reuseableBankName = replaceBankName(bankName); isaOverviewPage.clickIsaWithdrawButton(reuseableBankName); withdrawIsaAmountPage = new
+WithdrawalFromInstrumentForIsaPage(clientPageContext);
+}
+
+@And("the ISA withdrawal enter amount page displays with {string} header") public void theISAAddMoneyEnterAmountPageDisplaysHeader(String amountBoxText)
+throws InterruptedException { Thread.sleep(1000);
+WebElement amountBox = AMOUNT.findElement(clientPageContext.getWebDriver()); assertTrue(amountBox.isDisplayed());
+}
+}
+
+// Review Comment 3: Thread.sleep should be avoided, instead explicit waits can be used
+
+// Review Comment 4: @And should be changed to @Then or a new @Then should be added to the code
+
+
+
+// Review Comment 5: ‘replaceBankName’ method definition seems to be missing
+// Review Comment 6: ‘isaOverviewPage’ method have 2 parameters to be passed but ‘relativeUrl’ is missing
+
+
+Page Object:
+
+package uk.co.hlta.task.pagemodel;
+
+import org.openqa.selenium.By;
+import org.hamcrest.MatcherAssert;
+import org.openqa.selenium.StaleElementReferenceException;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.support.ui.FluentWait;
+import org.springframework.util.Assert;
+import uk.co.hl.savings.commons.testtools.pagemodel.PageContext;
+
+import javax.annotation.Nullable;
+import java.time.Duration;
+import java.util.List;
+import java.util.function.Function;
+
+public class isaOverviewPage extends BaseProxyPage {
+
+private static final By ISA_SUM_WITHDRAW = By.className("sv-withdraw-money");
+
+public isaOverviewPage(PageContext pageContext, String relativeUrl) {
+super(pageContext, relativeUrl);
+}
+
+public boolean clickIsaWithdrawButton(String reuseableBankName) { WebElement withdrawBank = new FluentWait<>(webDriver)
+.pollingEvery(Duration.ofSeconds(1))
+.withTimeout(Duration.ofSeconds(60))
+.until(new Function<WebDriver, WebElement>() { @javax.annotation.Nullable
+@Override
+public WebElement apply(@Nullable WebDriver webDriver) {
+
+try { pageContext.loadAndRefresh(OverviewPage.PATH);
+WebElement withdrawBank = getIsaWithdrawButton(reuseableBankName);
+if (withdrawBank.isDisplayed()) { WebElement withdrawButton;
+withdrawButton = withdrawBank.findElement(ISA_SUM_WITHDRAW); assertEnabledAndClickThenCheckForErrorPage(withdrawButton); return withdrawBank;
+}
+} catch (StaleElementReferenceException e) {
+}
+return null;
+}
+});
+if (withdrawBank != null) {
+return true;
+}
+return false;
+}
+
+public WebElement getIsaWithdrawButton(String reuseableBankName) { List<WebElement> overviewRows = findElementsBy(By.className("sv-overview-row"));
+Assert.isTrue(!overviewRows.isEmpty(), "Should have found at least one element"); for (WebElement overviewRow : overviewRows) {
+WebElement bankNameElement = overviewRow.findElement(By.cssSelector("[data- value-description=\"Bank Name\"]"));
+
+if (bankNameElement.getText().equals(reuseableBankName)) {
+return overviewRow;
+}
+}
+return null;
+}
+}
